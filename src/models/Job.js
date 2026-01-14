@@ -1,9 +1,9 @@
-import mongoose from "mongoose";
+// import mongoose from "mongoose";
 
-const JobSchema = new mongoose.Schema({
-    role: String,
-    skills: [String],
-    level: String,
-});
+// const JobSchema = new mongoose.Schema({
+//     role: String,
+//     skills: [String],
+//     level: String,
+// });
 
-export default mongoose.models.Job || mongoose.model("Job", JobSchema);
+// export default mongoose.models.Job || mongoose.model("Job", JobSchema);
