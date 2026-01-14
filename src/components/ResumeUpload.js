@@ -44,24 +44,25 @@ export default function ResumeUpload({ setResumeId }) {
     };
 
     return (
-        <div className="p-4 border rounded-md w-full max-w-md mx-auto">
-            <form onSubmit={handleSubmit}>
-                <input
-                    type="file"
-                    name="resume"
-                    accept=".pdf,.txt,.doc,.docx"
-                    onChange={handleFileChange}
-                    className="mb-2"
-                />
-                <button
-                    type="submit"
-                    className="bg-blue-500 text-white px-4 py-2 rounded"
-                >
-                    Upload
-                </button>
-            </form>
-            {message && <p className="mt-2 text-sm text-red-500">{message}</p>}
-        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 w-full">
+  <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row sm:items-center w-full gap-2">
+    <input
+      type="file"
+      name="resume"
+      accept=".pdf,.txt,.doc,.docx"
+      onChange={handleFileChange}
+      className="border border-blue-300 rounded px-2 py-1 w-full sm:w-auto"
+    />
+    <button
+      type="submit"
+      className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto"
+    >
+      Upload
+    </button>
+  </form>
+  {/* {message && <p className="text-sm text-red-500 w-full sm:w-auto">{message}</p>} */}
+</div>
+
     );
 }
 

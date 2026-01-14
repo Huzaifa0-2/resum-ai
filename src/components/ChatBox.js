@@ -283,7 +283,7 @@ export default function ChatBox({ resumeId }) {
       </div> */}
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 my-32">
         {messages.length === 0 ? (
           <div className="text-center pt-12">
             <div className="inline-flex p-4 rounded-2xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 mb-6">
@@ -431,7 +431,7 @@ export default function ChatBox({ resumeId }) {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t border-cyan-500/20 bg-gradient-to-r from-gray-900/80 to-black/80 backdrop-blur-sm">
+      <div className="p-4 fixed bottom-0 left-0 right-0 border-t border-cyan-500/20 bg-gradient-to-r from-gray-900/80 to-black/80 backdrop-blur-sm">
         <div className="flex items-end space-x-4">
           <div className="flex-1 relative">
             <textarea
@@ -440,7 +440,7 @@ export default function ChatBox({ resumeId }) {
               onChange={(e) => setMsg(e.target.value)}
               onKeyDown={handleKeyPress}
               placeholder="Ask about your resume, skills, career path..."
-              className="w-full p-4 pr-12 rounded-xl bg-gray-900/50 border border-cyan-500/20 focus:border-cyan-500/40 focus:outline-none text-white placeholder-gray-500 resize-none max-h-24 md:max-h-16"
+              className="w-full  max-h-24 md:max-h-16 p-2 pr-2 rounded-xl bg-gray-900/50 border border-cyan-500/20 focus:border-cyan-500/40 focus:outline-none text-white placeholder-gray-500 resize-none"
               rows={1}
               disabled={loading}
             />

@@ -313,7 +313,7 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8 relative">
         {/* Welcome Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
             <div>
               <h1 className="text-4xl font-bold mb-2">
                 Welcome back, <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
@@ -331,7 +331,7 @@ export default function Dashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {stats.map((stat, index) => (
               <div 
                 key={index} 
@@ -349,7 +349,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Upload & Quick Actions */}
           <div className="lg:col-span-2">
             {/* Upload Section */}
@@ -366,28 +366,32 @@ export default function Dashboard() {
                 
                 {resumeId && (
                   <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <CheckCircle className="w-5 h-5 text-green-400" />
-                        <span className="font-medium">Resume uploaded successfully!</span>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => router.push(`/match?resumeId=${resumeId}`)}
-                          className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 transition-all flex items-center space-x-2"
-                        >
-                          <Target className="w-4 h-4" />
-                          <span>Match Jobs</span>
-                        </button>
-                        <button
-                          onClick={() => router.push(`/chat?resumeId=${resumeId}`)}
-                          className="px-4 py-2 rounded-lg border border-purple-500/30 hover:bg-purple-500/10 transition-all flex items-center space-x-2"
-                        >
-                          <Brain className="w-4 h-4" />
-                          <span>Chat with AI</span>
-                        </button>
-                      </div>
-                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+  {/* Success Message */}
+  <div className="flex items-center space-x-3 w-full sm:w-auto">
+    <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+    <span className="font-medium">Resume uploaded successfully!</span>
+  </div>
+
+  {/* Action Buttons */}
+  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+    <button
+      onClick={() => router.push(`/match?resumeId=${resumeId}`)}
+      className="flex-1 min-w-[140px] px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 transition-all flex items-center justify-center space-x-2"
+    >
+      <Target className="w-4 h-4" />
+      <span>Match Jobs</span>
+    </button>
+    <button
+      onClick={() => router.push(`/chat?resumeId=${resumeId}`)}
+      className="flex-1 min-w-[140px] px-4 py-2 rounded-lg border border-purple-500/30 hover:bg-purple-500/10 transition-all flex items-center justify-center space-x-2"
+    >
+      <Brain className="w-4 h-4" />
+      <span>Chat with AI</span>
+    </button>
+  </div>
+</div>
+
                   </div>
                 )}
               </div>
@@ -424,7 +428,7 @@ export default function Dashboard() {
                       key={resume._id} 
                       className="group p-6 rounded-2xl bg-gradient-to-br from-gray-900/50 to-black/50 border border-cyan-500/10 hover:border-cyan-500/30 transition-all"
                     >
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
                         <div className="flex items-center space-x-4">
                           <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500/20 to-cyan-500/20">
                             <FileText className="w-6 h-6 text-cyan-400" />
@@ -457,17 +461,17 @@ export default function Dashboard() {
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() => router.push(`/match?resumeId=${resume._id}`)}
-                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 transition-all flex items-center space-x-2"
+                            className="flex-1 min-w-[120px] px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 transition-all flex items-center space-x-2"
                           >
                             <Target className="w-4 h-4" />
                             <span>Match Jobs</span>
                           </button>
                           <Link
                             href={`/chat?resumeId=${resume._id}`}
-                            className="px-4 py-2 rounded-lg border border-purple-500/30 hover:bg-purple-500/10 transition-all flex items-center space-x-2"
+                            className="flex-1 min-w-[120px] px-4 py-2 rounded-lg border border-purple-500/30 hover:bg-purple-500/10 transition-all flex items-center space-x-2"
                           >
                             <Brain className="w-4 h-4" />
                             <span>Chat with AI</span>
