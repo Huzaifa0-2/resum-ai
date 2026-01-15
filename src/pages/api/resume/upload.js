@@ -1,3 +1,271 @@
+import { getAuth } from "@clerk/nextjs/server";
+import { connectDB } from "@/lib/db";
+import Resume from "@/models/Resume";
+
+export const config = {
+  api: {
+    bodyParser: false, // Required for file uploads
+  },
+};
+
+export default async function handler(req, res) {
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    return res.status(405).json({ 
+      success: false, 
+      message: "Method not allowed. Use POST." 
+    });
+  }
+
+  try {
+    console.log("📤 Starting resume upload process...");
+
+    // Get user ID from Clerk
+    const { userId } = getAuth(req);
+    
+    if (!userId) {
+      console.log("❌ No user ID found - unauthorized");
+      return res.status(401).json({ 
+        success: false, 
+        message: "You must be logged in to upload a resume" 
+      });
+    }
+
+    console.log(`✅ Authenticated user: ${userId}`);
+
+    // Connect to database
+    await connectDB();
+    console.log("✅ Database connected");
+
+    // Check content type
+    const contentType = req.headers['content-type'];
+    if (!contentType || !contentType.includes('multipart/form-data')) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid content type. Expected multipart/form-data" 
+      });
+    }
+
+    // Parse multipart form data
+    const boundary = contentType.split('boundary=')[1];
+    if (!boundary) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid form data" 
+      });
+    }
+
+    // Read the request body
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    // Parse the multipart data
+    const parts = buffer.toString('binary').split(`--${boundary}`);
+    
+    let fileBuffer = null;
+    let filename = null;
+    let fileType = null;
+    
+    for (const part of parts) {
+      if (part.includes('Content-Disposition: form-data') && part.includes('name="resume"')) {
+        // Extract filename
+        const filenameMatch = part.match(/filename="([^"]+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+        
+        // Extract content type
+        const contentTypeMatch = part.match(/Content-Type: ([^\r\n]+)/);
+        if (contentTypeMatch) {
+          fileType = contentTypeMatch[1].trim();
+        }
+        
+        // Extract file content
+        const contentStart = part.indexOf('\r\n\r\n') + 4;
+        const contentEnd = part.lastIndexOf('\r\n');
+        if (contentStart < contentEnd) {
+          const fileContent = part.substring(contentStart, contentEnd);
+          fileBuffer = Buffer.from(fileContent, 'binary');
+        }
+        break;
+      }
+    }
+
+    // Validate file
+    if (!fileBuffer || !filename) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "No file uploaded or file parsing failed" 
+      });
+    }
+
+    console.log(`✅ File received: ${filename}, Type: ${fileType || 'unknown'}, Size: ${fileBuffer.length} bytes`);
+
+    // Validate file type
+    const allowedTypes = [
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ];
+    
+    if (fileType && !allowedTypes.includes(fileType)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid file type. Please upload PDF, TXT, DOC, or DOCX files." 
+      });
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (fileBuffer.length > maxSize) {
+      return res.status(413).json({ 
+        success: false, 
+        message: "File too large. Maximum size is 10MB." 
+      });
+    }
+
+    // Extract text based on file type
+    let extractedText = "";
+    
+    if (fileType === "application/pdf") {
+      try {
+        console.log("📄 Processing PDF file...");
+        const { default: pdfParse } = await import('pdf-parse');
+        const pdfData = await pdfParse(fileBuffer);
+        extractedText = pdfData.text || "";
+        
+        if (extractedText.trim()) {
+          console.log(`✅ PDF text extracted: ${extractedText.length} characters`);
+        } else {
+          console.log("⚠️ PDF extraction returned empty text, using fallback");
+          // Fallback: try to extract any readable text
+          extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 10000));
+        }
+      } catch (pdfError) {
+        console.error("❌ PDF parsing error:", pdfError.message);
+        // Fallback for PDF errors
+        extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 10000));
+      }
+    } else if (fileType === "text/plain") {
+      console.log("📝 Processing text file...");
+      extractedText = fileBuffer.toString('utf-8');
+      console.log(`✅ Text file processed: ${extractedText.length} characters`);
+    } else {
+      // For DOC/DOCX or unknown types
+      console.log("📄 Processing document file...");
+      try {
+        extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 50000));
+        // Clean up non-printable characters
+        extractedText = extractedText.replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+        console.log(`✅ Document processed: ${extractedText.length} characters`);
+      } catch (error) {
+        console.error("Document processing error:", error);
+        extractedText = "[Could not extract text from this file type]";
+      }
+    }
+
+    // Clean and trim the text
+    let cleanedText = extractedText
+      .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+      .replace(/\n\s*\n/g, '\n') // Normalize line breaks
+      .trim();
+
+    // Limit text length for MongoDB
+    const maxTextLength = 100000; // 100KB
+    if (cleanedText.length > maxTextLength) {
+      console.log(`⚠️ Text truncated from ${cleanedText.length} to ${maxTextLength} characters`);
+      cleanedText = cleanedText.substring(0, maxTextLength) + "... [text truncated]";
+    }
+
+    // Check if we have meaningful content
+    if (!cleanedText || cleanedText.trim().length < 10) {
+      console.log("⚠️ Extracted text is very short or empty");
+      cleanedText = cleanedText || "[No readable text content could be extracted from the file]";
+    }
+
+    console.log(`✅ Final text length: ${cleanedText.length} characters`);
+
+    // Save to MongoDB
+    console.log("💾 Saving to MongoDB...");
+    const savedResume = await Resume.create({
+      userId: userId,
+      filename: filename,
+      text: cleanedText,
+      uploadedAt: new Date(),
+    });
+
+    console.log(`✅ Resume saved with ID: ${savedResume._id}`);
+
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      resumeId: savedResume._id,
+      message: "Resume uploaded successfully",
+      filename: savedResume.filename,
+      textLength: savedResume.text.length,
+    });
+
+  } catch (error) {
+    console.error("❌ UPLOAD ERROR:", error);
+    
+    // Return appropriate error message
+    let errorMessage = "An unexpected error occurred";
+    let statusCode = 500;
+
+    if (error.message?.includes("Mongo") || error.message?.includes("database")) {
+      errorMessage = "Database error. Please try again.";
+    } else if (error.message?.includes("PDF") || error.message?.includes("parse")) {
+      errorMessage = "Error processing the file. Please try a different file.";
+    }
+
+    return res.status(statusCode).json({
+      success: false,
+      message: errorMessage,
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // import fs from "fs";
 // import path from "path";
 // import formidable from "formidable";
@@ -493,235 +761,3 @@
 
 
 
-// pages/api/resume/upload.js
-import { getAuth } from "@clerk/nextjs/server";
-import { connectDB } from "@/lib/db";
-import Resume from "@/models/Resume";
-
-export const config = {
-  api: {
-    bodyParser: false, // Required for file uploads
-  },
-};
-
-export default async function handler(req, res) {
-  // Only allow POST requests
-  if (req.method !== "POST") {
-    return res.status(405).json({ 
-      success: false, 
-      message: "Method not allowed. Use POST." 
-    });
-  }
-
-  try {
-    console.log("📤 Starting resume upload process...");
-
-    // Get user ID from Clerk
-    const { userId } = getAuth(req);
-    
-    if (!userId) {
-      console.log("❌ No user ID found - unauthorized");
-      return res.status(401).json({ 
-        success: false, 
-        message: "You must be logged in to upload a resume" 
-      });
-    }
-
-    console.log(`✅ Authenticated user: ${userId}`);
-
-    // Connect to database
-    await connectDB();
-    console.log("✅ Database connected");
-
-    // Check content type
-    const contentType = req.headers['content-type'];
-    if (!contentType || !contentType.includes('multipart/form-data')) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid content type. Expected multipart/form-data" 
-      });
-    }
-
-    // Parse multipart form data
-    const boundary = contentType.split('boundary=')[1];
-    if (!boundary) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid form data" 
-      });
-    }
-
-    // Read the request body
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-
-    // Parse the multipart data
-    const parts = buffer.toString('binary').split(`--${boundary}`);
-    
-    let fileBuffer = null;
-    let filename = null;
-    let fileType = null;
-    
-    for (const part of parts) {
-      if (part.includes('Content-Disposition: form-data') && part.includes('name="resume"')) {
-        // Extract filename
-        const filenameMatch = part.match(/filename="([^"]+)"/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-        
-        // Extract content type
-        const contentTypeMatch = part.match(/Content-Type: ([^\r\n]+)/);
-        if (contentTypeMatch) {
-          fileType = contentTypeMatch[1].trim();
-        }
-        
-        // Extract file content
-        const contentStart = part.indexOf('\r\n\r\n') + 4;
-        const contentEnd = part.lastIndexOf('\r\n');
-        if (contentStart < contentEnd) {
-          const fileContent = part.substring(contentStart, contentEnd);
-          fileBuffer = Buffer.from(fileContent, 'binary');
-        }
-        break;
-      }
-    }
-
-    // Validate file
-    if (!fileBuffer || !filename) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "No file uploaded or file parsing failed" 
-      });
-    }
-
-    console.log(`✅ File received: ${filename}, Type: ${fileType || 'unknown'}, Size: ${fileBuffer.length} bytes`);
-
-    // Validate file type
-    const allowedTypes = [
-      "application/pdf",
-      "text/plain",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ];
-    
-    if (fileType && !allowedTypes.includes(fileType)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid file type. Please upload PDF, TXT, DOC, or DOCX files." 
-      });
-    }
-
-    // Validate file size (10MB limit)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (fileBuffer.length > maxSize) {
-      return res.status(413).json({ 
-        success: false, 
-        message: "File too large. Maximum size is 10MB." 
-      });
-    }
-
-    // Extract text based on file type
-    let extractedText = "";
-    
-    if (fileType === "application/pdf") {
-      try {
-        console.log("📄 Processing PDF file...");
-        const { default: pdfParse } = await import('pdf-parse');
-        const pdfData = await pdfParse(fileBuffer);
-        extractedText = pdfData.text || "";
-        
-        if (extractedText.trim()) {
-          console.log(`✅ PDF text extracted: ${extractedText.length} characters`);
-        } else {
-          console.log("⚠️ PDF extraction returned empty text, using fallback");
-          // Fallback: try to extract any readable text
-          extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 10000));
-        }
-      } catch (pdfError) {
-        console.error("❌ PDF parsing error:", pdfError.message);
-        // Fallback for PDF errors
-        extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 10000));
-      }
-    } else if (fileType === "text/plain") {
-      console.log("📝 Processing text file...");
-      extractedText = fileBuffer.toString('utf-8');
-      console.log(`✅ Text file processed: ${extractedText.length} characters`);
-    } else {
-      // For DOC/DOCX or unknown types
-      console.log("📄 Processing document file...");
-      try {
-        extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 50000));
-        // Clean up non-printable characters
-        extractedText = extractedText.replace(/[^\x20-\x7E\n\r\t]/g, ' ');
-        console.log(`✅ Document processed: ${extractedText.length} characters`);
-      } catch (error) {
-        console.error("Document processing error:", error);
-        extractedText = "[Could not extract text from this file type]";
-      }
-    }
-
-    // Clean and trim the text
-    let cleanedText = extractedText
-      .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
-      .replace(/\n\s*\n/g, '\n') // Normalize line breaks
-      .trim();
-
-    // Limit text length for MongoDB
-    const maxTextLength = 100000; // 100KB
-    if (cleanedText.length > maxTextLength) {
-      console.log(`⚠️ Text truncated from ${cleanedText.length} to ${maxTextLength} characters`);
-      cleanedText = cleanedText.substring(0, maxTextLength) + "... [text truncated]";
-    }
-
-    // Check if we have meaningful content
-    if (!cleanedText || cleanedText.trim().length < 10) {
-      console.log("⚠️ Extracted text is very short or empty");
-      cleanedText = cleanedText || "[No readable text content could be extracted from the file]";
-    }
-
-    console.log(`✅ Final text length: ${cleanedText.length} characters`);
-
-    // Save to MongoDB
-    console.log("💾 Saving to MongoDB...");
-    const savedResume = await Resume.create({
-      userId: userId,
-      filename: filename,
-      text: cleanedText,
-      uploadedAt: new Date(),
-    });
-
-    console.log(`✅ Resume saved with ID: ${savedResume._id}`);
-
-    // Return success response
-    return res.status(200).json({
-      success: true,
-      resumeId: savedResume._id,
-      message: "Resume uploaded successfully",
-      filename: savedResume.filename,
-      textLength: savedResume.text.length,
-    });
-
-  } catch (error) {
-    console.error("❌ UPLOAD ERROR:", error);
-    
-    // Return appropriate error message
-    let errorMessage = "An unexpected error occurred";
-    let statusCode = 500;
-
-    if (error.message?.includes("Mongo") || error.message?.includes("database")) {
-      errorMessage = "Database error. Please try again.";
-    } else if (error.message?.includes("PDF") || error.message?.includes("parse")) {
-      errorMessage = "Error processing the file. Please try a different file.";
-    }
-
-    return res.status(statusCode).json({
-      success: false,
-      message: errorMessage,
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
-  }
-}

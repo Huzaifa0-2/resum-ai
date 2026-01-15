@@ -94,9 +94,25 @@ export default async function handler(req, res) {
         console.log("Resume text in chat APIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII:", resume.text);
 
         // Combine resume + question
-        const prompt = `You are a career assistant. Here is the user's resume:
-    -------------------------${resume.text}-------------------------
-    User question:${message}Answer clearly and concisely.`;
+        const prompt = `You are a career assistant. 
+            Here is the user's resume:-------------------------${resume.text}-------------------------
+            User question:-------------------------${message}-------------------------
+            
+            RESPONSE REQUIREMENTS:
+            1. Base ALL advice SOLELY on information provided in the resume above
+            2. If the resume lacks information needed to answer, acknowledge this limitation
+            3. Use clear, professional language
+            4. Structure your response with:
+                - Brief overview of what you're addressing
+                - Main points (use bullet points or numbered lists) where needed
+                - Actionable recommendations if needed
+                - Summary or conclusion of the response
+                - Professional tone (use emojis sparingly if at all)`;
+
+        // const prompt = `You are a career assistant. Here is the 
+        // user's resume: -------------------------${resume.text}------------------------- 
+        // User question:${message}
+        // Answer must be well structured, clearly and concisely.`;
 
         // FREE Gemini model 
         const model = "gemini-2.5-flash-lite";
