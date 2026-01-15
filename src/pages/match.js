@@ -74,7 +74,7 @@ export default function MatchPage() {
         {show === false ? (
           <div className="text-center pt-12">
             <h1 className="text-3xl font-bold">Specifically For IT Roles</h1>
-            <p className="my-6 px-96">Discover your perfect tech career match.
+            <p className="my-6 md:px-96">Discover your perfect tech career match.
               Our AI analyzes your resume against <b>IT roles </b>
               and calculates your skill compatibility percentage.</p>
             <h2 className="text-2xl font-semibold mb-4">What our AI will provide</h2>

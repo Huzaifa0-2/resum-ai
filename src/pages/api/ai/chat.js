@@ -94,20 +94,48 @@ export default async function handler(req, res) {
         console.log("Resume text in chat APIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII:", resume.text);
 
         // Combine resume + question
+
+
         const prompt = `You are a career assistant. 
-            Here is the user's resume:-------------------------${resume.text}-------------------------
-            User question:-------------------------${message}-------------------------
-            
-            RESPONSE REQUIREMENTS:
-            1. Base ALL advice SOLELY on information provided in the resume above
-            2. If the resume lacks information needed to answer, acknowledge this limitation
-            3. Use clear, professional language
-            4. Structure your response with:
-                - Brief overview of what you're addressing
-                - Main points (use bullet points or numbered lists) where needed
-                - Actionable recommendations if needed
-                - Summary or conclusion of the response
-                - Professional tone (use emojis sparingly if at all)`;
+            Here is the user's resume:
+            ${resume.text}
+
+            User question:
+            ${message}
+
+            RESPONSE INSTRUCTIONS:
+            1. Base ALL advice SOLELY on the information provided in the resume above.
+            2. If the resume lacks information needed to answer, clearly acknowledge this.
+            3. Use clear and professional language.
+            4. Answer in plain text only — DO NOT use Markdown symbols (#, *, -, _, \`\`\`, etc.).
+            5. Dynamically format your response:
+            - If the user's question is simple and factual (e.g., "What is my name?"), provide a **direct, concise answer only**.
+            - If the question requires analysis, recommendations, or guidance, structure your response with:
+                • A brief overview of what you're addressing
+                • Main points (bullet points or numbered lists if necessary)
+                • Actionable recommendations if relevant
+                • Summary or conclusion
+            6. Maintain a professional tone, using emojis sparingly if at all.`;
+
+
+
+        // const prompt = `You are a career assistant. 
+        //     Here is the user's resume:-------------------------${resume.text}-------------------------
+        //     User question:-------------------------${message}-------------------------
+
+        //     RESPONSE REQUIREMENTS:
+        //     1. Base ALL advice SOLELY on information provided in the resume above
+        //     2. If the resume lacks information needed to answer, acknowledge this limitation
+        //     3. Use clear, professional language
+        //     4. Structure your response with:
+        //         - Brief overview of what you're addressing
+        //         - Main points (use bullet points or numbered lists) where needed
+        //         - Actionable recommendations if needed
+        //         - Summary or conclusion of the response
+        //         - Use plain text format - NO markdown symbols (#, *, -, _, \`\`\`, etc.)
+        //         - Professional tone (use emojis sparingly if at all)`;
+
+
 
         // const prompt = `You are a career assistant. Here is the 
         // user's resume: -------------------------${resume.text}------------------------- 

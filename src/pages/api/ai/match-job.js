@@ -123,6 +123,7 @@ export default async function (req, res) {
             5. Also provide overall analysis: which career path the user is best suited for based on their skills
 
             Rules:
+            - Use plain text format - NO markdown symbols (#, *, -, _, \`\`\`, etc.)
             - Use ONLY the information provided.
             - Do NOT assume or invent skills.
             - Be clear and concise.
@@ -133,25 +134,24 @@ export default async function (req, res) {
             🏆 TOP 3 JOB MATCHES:
 
             1. [Job Title] ([Level]) - [X]% match
-            • ✅ Skills Found: [list]
-            • ❌ Skills Missing: [list]
-            • 📚 Learn: [suggestions]
+                ✅ Skills Found: [list]
+                ❌ Skills Missing: [list]
+                📚 Learn: [suggestions]
 
             2. [Job Title] ([Level]) - [X]% match
-            • ✅ Skills Found: [list]
-            • ❌ Skills Missing: [list]
-            • 📚 Learn: [suggestions]
+                ✅ Skills Found: [list]
+                ❌ Skills Missing: [list]
+                📚 Learn: [suggestions]
 
             3. [Job Title] ([Level]) - [X]% match
-            • ✅ Skills Found: [list]
-            • ❌ Skills Missing: [list]
-            • 📚 Learn: [suggestions]
+                ✅ Skills Found: [list]
+                ❌ Skills Missing: [list]
+                📚 Learn: [suggestions]
 
             💡 CAREER RECOMMENDATIONS:
-            [Provide overall analysis of which career path suits the user best and advice here]
+            [Provide overall analysis and advice here]
 
-            IMPORTANT: Be specific about which skills from the job description were actually found in the resume.
-`;
+            IMPORTANT: Be specific about which skills from the job description were actually found in the resume.`;
 
         const model = "gemini-2.5-flash-lite";
 
