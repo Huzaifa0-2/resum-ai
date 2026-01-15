@@ -65,427 +65,663 @@
 
 
 
-// pages/api/upload-resume.js
-import fs from "fs";
-import path from "path";
-import formidable from "formidable";
+// // pages/api/upload-resume.js
+// import fs from "fs";
+// import path from "path";
+// import formidable from "formidable";
+// import { connectDB } from "@/lib/db";
+// import Resume from "@/models/Resume";
+
+// /**
+//  * API Route: /api/upload-resume
+//  * Purpose: Handle resume file uploads, extract text content, and store in MongoDB
+//  * Supported file types: PDF, TXT, DOC, DOCX (with basic text extraction)
+//  */
+
+// // Next.js API configuration - disable built-in body parser to handle file uploads
+// export const config = {
+//   api: {
+//     bodyParser: false, // Disable Next.js body parser to use formidable for file uploads
+//   },
+// };
+
+// /**
+//  * Main API handler function
+//  * @param {object} req - HTTP request object
+//  * @param {object} res - HTTP response object
+//  */
+// import { getAuth } from "@clerk/nextjs/server";
+
+
+// export default async function handler(req, res) {
+//   // Only allow POST requests for file uploads
+//   if (req.method !== "POST") {
+//     return res.status(405).json({ 
+//       success: false, 
+//       message: "Method not allowed. Use POST for file uploads." 
+//     });
+//   }
+
+//   let tempFilePath = null; // Track temporary file path for cleanup
+//   let connectionEstablished = false; // Track database connection status
+
+//   try {
+//     // ================================
+//     // 1. ESTABLISH DATABASE CONNECTION
+//     // ================================
+
+
+//    const { userId } = getAuth(req);
+    
+//     if (!userId) {
+//       return res.status(401).json({ 
+//         success: false, 
+//         message: "You must be logged in to upload a resume" 
+//       });
+//     }
+
+//     console.log("📊 Connecting to database...");
+//     await connectDB();
+//     connectionEstablished = true;
+//     console.log("✅ Database connected successfully");
+
+//     // ================================
+//     // 2. SETUP UPLOAD DIRECTORY
+//     // ================================
+//     const uploadDir = path.join(process.cwd(), "uploads");
+    
+//     // Create uploads directory if it doesn't exist
+//     if (!fs.existsSync(uploadDir)) {
+//       console.log(`📁 Creating upload directory: ${uploadDir}`);
+//       fs.mkdirSync(uploadDir, { recursive: true });
+//     }
+
+//     // ================================
+//     // 3. CONFIGURE FORMIDABLE FOR FILE UPLOAD
+//     // ================================
+//     console.log("📤 Configuring file upload...");
+//     const form = formidable({
+//       uploadDir,                    // Directory to store uploaded files temporarily
+//       keepExtensions: true,         // Keep original file extensions
+//       multiples: false,             // Allow only single file upload per request
+//       maxFileSize: 10 * 1024 * 1024, // Limit file size to 10MB (adjust as needed)
+//       maxFields: 5,                 // Limit number of form fields
+//       maxFieldsSize: 1024 * 1024,   // Limit total size of form fields (1MB)
+      
+//       // Security: Filter potentially dangerous files
+//       filter: ({ name, originalFilename, mimetype }) => {
+//         console.log(`🔍 Validating file: ${originalFilename}, Type: ${mimetype}`);
+        
+//         // Only allow specific file types
+//         const allowedMimeTypes = [
+//           "application/pdf",                          // PDF files
+//           "text/plain",                               // Text files
+//           "application/msword",                       // DOC files
+//           "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // DOCX files
+//         ];
+
+//         const isAllowed = allowedMimeTypes.includes(mimetype);
+//         if (!isAllowed) {
+//           console.warn(`⚠️ Rejected file type: ${mimetype}`);
+//         }
+//         return isAllowed;
+//       }
+//     });
+
+//     // ================================
+//     // 4. PARSE FORM DATA AND UPLOAD FILE
+//     // ================================
+//     console.log("🔄 Parsing form data...");
+    
+//     // Parse the incoming form data (files + fields)
+//     // formidable.parse returns an array: [fields, files]
+//     const [fields, files] = await form.parse(req);
+    
+//     // Extract the uploaded resume file
+//     const file = files.resume?.[0];
+    
+//     // Validate that a file was uploaded
+//     if (!file || !file.filepath) {
+//       console.error("❌ No file uploaded or file parsing failed");
+//       return res.status(400).json({ 
+//         success: false,  
+//         message: "No file uploaded. Please select a resume file." 
+//       });
+//     }
+
+//     // Store temp file path for cleanup
+//     tempFilePath = file.filepath;
+//     console.log(`✅ File uploaded temporarily to: ${tempFilePath}`);
+//     console.log(`📄 File details: ${file.originalFilename}, Size: ${file.size} bytes, Type: ${file.mimetype}`);
+
+//     // ================================
+//     // 5. READ AND VALIDATE FILE CONTENT
+//     // ================================
+//     console.log("📖 Reading file content...");
+    
+//     // Check if file exists and has content
+//     if (!fs.existsSync(file.filepath)) {
+//       throw new Error("Uploaded file not found on server");
+//     }
+
+//     const stats = fs.statSync(file.filepath);
+//     if (stats.size === 0) {
+//       throw new Error("Uploaded file is empty");
+//     }
+
+   
+//     // ================================
+//     // 6. EXTRACT TEXT FROM FILE BASED ON TYPE
+//     // ================================
+//     console.log(`🔧 Extracting text from ${file.mimetype}...`);
+//     let extractedText = "";
+//     const buffer = fs.readFileSync(file.filepath);
+
+//     // DEBUG: Check what we're getting
+//     console.log(`📊 Buffer size: ${buffer.length} bytes`);
+//     console.log(`🔍 First 100 chars of buffer: ${buffer.toString('utf-8', 0, 100)}`);
+
+//     // Handle different file types
+//     if (file.mimetype === "application/pdf") {
+//       // PDF file - use pdf-parse for text extraction
+//       try {
+//         console.log("📄 Processing PDF file...");
+        
+//         // FIX: Try different import methods for pdf-parse
+//         let pdfParse;
+//         try {
+//           // Method 1: Try as default export
+//           const pdfModule = await import('pdf-parse');
+//           pdfParse = pdfModule.default;
+//           console.log("✅ Imported pdf-parse as default export");
+//         } catch (importError) {
+//           // Method 2: Try as named export
+//           const pdfModule = await import('pdf-parse');
+//           pdfParse = pdfModule;
+//           console.log("✅ Imported pdf-parse as named export");
+//         }
+        
+//         // Verify pdfParse is a function
+//         if (typeof pdfParse !== 'function') {
+//           throw new Error(`pdf-parse is not a function. Type: ${typeof pdfParse}`);
+//         }
+        
+//         // Parse PDF and extract text
+//         console.log("🔄 Parsing PDF buffer...");
+//         const pdfData = await pdfParse(buffer);
+//         extractedText = pdfData.text || "";
+        
+//         console.log(`✅ PDF text extracted: ${extractedText.length} characters`);
+        
+//         if (extractedText.length > 0) {
+//           console.log("📝 First 200 chars:", extractedText.substring(0, 200));
+//         }
+        
+//         // Check if PDF extraction was successful
+//         if (!extractedText || extractedText.trim().length === 0) {
+//           console.warn("⚠️ PDF appears to be empty or text extraction failed");
+          
+//           // Try alternative: Check if buffer has content
+//           const bufferString = buffer.toString('utf-8', 0, 1000);
+//           console.log("🔍 First 1000 chars of buffer:", bufferString.substring(0, 200));
+          
+//           extractedText = "[PDF content extraction returned empty text]";
+//         }
+        
+//       } catch (pdfError) {
+//         console.error("❌ PDF parsing error:", pdfError.message);
+//         console.error("❌ Error stack:", pdfError.stack);
+        
+//         // Fallback: Try to extract text manually
+//         try {
+//           console.log("🔄 Trying manual text extraction...");
+//           const bufferString = buffer.toString('latin1');
+          
+//           // Look for text patterns in PDF
+//           const textInParentheses = bufferString.match(/\((.*?)\)/g);
+//           if (textInParentheses) {
+//             extractedText = textInParentheses
+//               .map(text => text.slice(1, -1))
+//               .filter(text => text.length > 1)
+//               .join(' ');
+//             console.log(`✅ Manual extraction from parentheses: ${extractedText.length} chars`);
+//           }
+          
+//           if (!extractedText || extractedText.length < 50) {
+//             // Try to extract any readable ASCII text
+//             const asciiText = buffer.toString('ascii', 0, Math.min(buffer.length, 10000));
+//             const readableWords = asciiText.match(/[A-Za-z]{3,}/g);
+//             if (readableWords) {
+//               extractedText = readableWords.join(' ');
+//               console.log(`✅ ASCII extraction: ${extractedText.length} chars`);
+//             }
+//           }
+          
+//           if (!extractedText || extractedText.length < 10) {
+//             extractedText = `[PDF parsing failed: ${pdfError.message}]`;
+//           }
+          
+//         } catch (fallbackError) {
+//           extractedText = `[All extraction methods failed: ${pdfError.message}]`;
+//         }
+//       }
+//     } else if (file.mimetype === "text/plain") {
+//       // Plain text file - direct UTF-8 conversion
+//       console.log("📝 Processing text file...");
+//       extractedText = buffer.toString("utf-8");
+//       console.log(`✅ Text file processed: ${extractedText.length} characters`);
+//     } else if (
+//       file.mimetype === "application/msword" || 
+//       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+//     ) {
+//       // Word document - basic text extraction
+//       console.log("📘 Processing Word document...");
+      
+//       // For DOC/DOCX files, we do basic text extraction
+//       // Note: For better extraction, consider using 'mammoth' library
+//       try {
+//         extractedText = buffer.toString("utf-8", 0, Math.min(buffer.length, 50000));
+        
+//         // Clean up binary artifacts for Word docs
+//         extractedText = extractedText.replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+//         console.log(`✅ Word document processed: ${extractedText.length} characters`);
+        
+//         if (!extractedText || extractedText.trim().length < 10) {
+//           extractedText = "[Word document content extraction limited. Consider using a dedicated DOCX parser for better results.]";
+//         }
+//       } catch (wordError) {
+//         console.error("❌ Word document processing error:", wordError.message);
+//         extractedText = `[Error processing Word document: ${wordError.message}]`;
+//       }
+//     } else {
+//       // Unsupported file type (should be caught by filter, but double-check)
+//       throw new Error(`Unsupported file type: ${file.mimetype}`);
+//     }
+//     // ================================
+//     // 7. CLEAN AND VALIDATE EXTRACTED TEXT
+//     // ================================
+//     console.log("🧹 Cleaning extracted text...");
+    
+//     // First, check if we have actual text or just error messages
+//     if (extractedText.startsWith('[ERROR:') || 
+//         extractedText.startsWith('[PDF') || 
+//         extractedText.startsWith('[This PDF') ||
+//         extractedText.startsWith('[Could not')) {
+//       console.log("ℹ️ Extracted text appears to be an error message, not actual resume text");
+//       // Keep the error message as-is so user knows what happened
+//     } else if (extractedText.includes("%PDF-1.")) {
+//       console.error("❌ ERROR: Still getting raw PDF data!");
+//       extractedText = "[ERROR: PDF text extraction completely failed. Try a different PDF file.]";
+//     }
+    
+//     // Only clean if we have actual text
+//     let cleanedText = extractedText;
+//     if (!cleanedText.startsWith('[')) {
+//       // Remove excessive whitespace and normalize
+//       cleanedText = extractedText
+//         .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
+//         .replace(/\n\s*\n/g, '\n\n')    // Normalize line breaks
+//         .trim();
+      
+//       // Limit text length to prevent MongoDB document size issues
+//       const maxTextLength = 100000; // 100KB max
+//       if (cleanedText.length > maxTextLength) {
+//         console.warn(`⚠️ Text truncated from ${cleanedText.length} to ${maxTextLength} characters`);
+//         cleanedText = cleanedText.substring(0, maxTextLength) + "... [text truncated]";
+//       }
+      
+//       // Check if we have meaningful text
+//       if (!cleanedText || cleanedText.trim().length < 10) {
+//         console.warn("⚠️ Extracted text is very short or empty");
+//         cleanedText = "[No text content could be extracted from the file]";
+//       }
+//     }
+
+//     console.log(`✅ Text cleaned: ${cleanedText.length} characters remaining`);
+//     console.log(`📝 Final text to save (first 500 chars): ${cleanedText.substring(0, 500)}`);
+    
+//     // Check if it's worth saving
+//     if (cleanedText.startsWith('[') && cleanedText.endsWith(']')) {
+//       console.warn("⚠️ Warning: Only saving error message, not actual resume text");
+//     }
+//     // ================================
+//     // 8. SAVE TO MONGODB
+//     // ================================
+//     console.log("💾 Saving to MongoDB...");
+    
+//    console.log(`📦 Text content type: ${typeof cleanedText}`);
+//     console.log(`📦 Text starts with: ${cleanedText.substring(0, 50)}...`);
+//     console.log(`📦 Text ends with: ...${cleanedText.substring(Math.max(0, cleanedText.length - 50))}`);
+
+//     // Extract userId from form fields (assuming it's sent in the form)
+//     // Note: Your Resume model doesn't have userId field based on your schema
+//     // If you need userId, you should add it to the schema
+//     // const userId = fields.userId?.[0] || "unknown";
+    
+//     // Create document in MongoDB using your Resume model
+//     const savedResume = await Resume.create({
+//       userId: userId,
+//       filename: file.originalFilename,
+//       text: cleanedText,
+//       uploadedAt: new Date(),
+//     });
+
+//     console.log(`✅ Saved to MongoDB with ID: ${savedResume._id}`);
+//     res.json({ success: true, resumeId: savedResume._id });
+
+//     // ================================
+//     // 9. CLEANUP TEMPORARY FILE
+//     // ================================
+//     console.log("🗑️ Cleaning up temporary file...");
+//     if (fs.existsSync(file.filepath)) {
+//       try {
+//         fs.unlinkSync(file.filepath);
+//         console.log(`✅ Temporary file deleted: ${file.filepath}`);
+//       } catch (cleanupError) {
+//         console.error("⚠️ Failed to delete temporary file:", cleanupError.message);
+//         // Don't fail the request if cleanup fails
+//       }
+//     }
+
+//     // ================================
+//     // 10. RETURN SUCCESS RESPONSE
+//     // ================================
+//     console.log("🎉 Upload process completed successfully");
+    
+//     return res.status(200).json({
+//       success: true,
+//       message: "Resume uploaded and processed successfully",
+//       data: {
+//         resumeId: savedResume._id.toString(),
+//         filename: savedResume.filename,
+//         textLength: savedResume.text.length,
+//         uploadDate: savedResume.uploadedAt,
+//       }
+//     });
+
+//   } catch (error) {
+//     // ================================
+//     // ERROR HANDLING AND CLEANUP
+//     // ================================
+//     console.error("❌ UPLOAD ERROR:", error);
+
+//     // Cleanup temporary file if it exists
+//     if (tempFilePath && fs.existsSync(tempFilePath)) {
+//       try {
+//         fs.unlinkSync(tempFilePath);
+//         console.log(`✅ Cleared temporary file after error: ${tempFilePath}`);
+//       } catch (cleanupError) {
+//         console.error("❌ Failed to cleanup temp file after error:", cleanupError.message);
+//       }
+//     }
+
+//     // Determine appropriate error response
+//     let statusCode = 500;
+//     let errorMessage = "An unexpected error occurred";
+
+//     // Handle specific error types
+//     if (error.message.includes("maxFileSize") || error.code === "LIMIT_FILE_SIZE") {
+//       statusCode = 413;
+//       errorMessage = "File too large. Maximum size is 10MB.";
+//     } else if (error.message.includes("Unsupported file type") || error.message.includes("Invalid file type")) {
+//       statusCode = 400;
+//       errorMessage = "Unsupported file type. Please upload PDF, TXT, DOC, or DOCX files only.";
+//     } else if (error.message.includes("No file uploaded")) {
+//       statusCode = 400;
+//       errorMessage = "No file was uploaded. Please select a resume file.";
+//     } else if (error.message.includes("empty")) {
+//       statusCode = 400;
+//       errorMessage = "Uploaded file is empty.";
+//     }
+
+//     // Return error response
+//     return res.status(statusCode).json({
+//       success: false,
+//       message: errorMessage,
+//       error: process.env.NODE_ENV === "development" ? error.message : undefined,
+//       timestamp: new Date().toISOString()
+//     });
+//   } finally {
+//     // Optional: Close database connection if you're managing connections manually
+//     // Note: Mongoose typically handles connection pooling automatically
+//     if (connectionEstablished) {
+//       console.log("🔌 Database connection maintained (pooled)");
+//     }
+//   }
+// }
+
+
+
+
+// pages/api/resume/upload.js
+import { getAuth } from "@clerk/nextjs/server";
 import { connectDB } from "@/lib/db";
 import Resume from "@/models/Resume";
 
-/**
- * API Route: /api/upload-resume
- * Purpose: Handle resume file uploads, extract text content, and store in MongoDB
- * Supported file types: PDF, TXT, DOC, DOCX (with basic text extraction)
- */
-
-// Next.js API configuration - disable built-in body parser to handle file uploads
 export const config = {
   api: {
-    bodyParser: false, // Disable Next.js body parser to use formidable for file uploads
+    bodyParser: false, // Required for file uploads
   },
 };
 
-/**
- * Main API handler function
- * @param {object} req - HTTP request object
- * @param {object} res - HTTP response object
- */
-import { getAuth } from "@clerk/nextjs/server";
-
-
 export default async function handler(req, res) {
-  // Only allow POST requests for file uploads
+  // Only allow POST requests
   if (req.method !== "POST") {
     return res.status(405).json({ 
       success: false, 
-      message: "Method not allowed. Use POST for file uploads." 
+      message: "Method not allowed. Use POST." 
     });
   }
 
-  let tempFilePath = null; // Track temporary file path for cleanup
-  let connectionEstablished = false; // Track database connection status
-
   try {
-    // ================================
-    // 1. ESTABLISH DATABASE CONNECTION
-    // ================================
+    console.log("📤 Starting resume upload process...");
 
-
-   const { userId } = getAuth(req);
+    // Get user ID from Clerk
+    const { userId } = getAuth(req);
     
     if (!userId) {
+      console.log("❌ No user ID found - unauthorized");
       return res.status(401).json({ 
         success: false, 
         message: "You must be logged in to upload a resume" 
       });
     }
 
-    console.log("📊 Connecting to database...");
+    console.log(`✅ Authenticated user: ${userId}`);
+
+    // Connect to database
     await connectDB();
-    connectionEstablished = true;
-    console.log("✅ Database connected successfully");
+    console.log("✅ Database connected");
 
-    // ================================
-    // 2. SETUP UPLOAD DIRECTORY
-    // ================================
-    const uploadDir = path.join(process.cwd(), "uploads");
-    
-    // Create uploads directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      console.log(`📁 Creating upload directory: ${uploadDir}`);
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // ================================
-    // 3. CONFIGURE FORMIDABLE FOR FILE UPLOAD
-    // ================================
-    console.log("📤 Configuring file upload...");
-    const form = formidable({
-      uploadDir,                    // Directory to store uploaded files temporarily
-      keepExtensions: true,         // Keep original file extensions
-      multiples: false,             // Allow only single file upload per request
-      maxFileSize: 10 * 1024 * 1024, // Limit file size to 10MB (adjust as needed)
-      maxFields: 5,                 // Limit number of form fields
-      maxFieldsSize: 1024 * 1024,   // Limit total size of form fields (1MB)
-      
-      // Security: Filter potentially dangerous files
-      filter: ({ name, originalFilename, mimetype }) => {
-        console.log(`🔍 Validating file: ${originalFilename}, Type: ${mimetype}`);
-        
-        // Only allow specific file types
-        const allowedMimeTypes = [
-          "application/pdf",                          // PDF files
-          "text/plain",                               // Text files
-          "application/msword",                       // DOC files
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // DOCX files
-        ];
-
-        const isAllowed = allowedMimeTypes.includes(mimetype);
-        if (!isAllowed) {
-          console.warn(`⚠️ Rejected file type: ${mimetype}`);
-        }
-        return isAllowed;
-      }
-    });
-
-    // ================================
-    // 4. PARSE FORM DATA AND UPLOAD FILE
-    // ================================
-    console.log("🔄 Parsing form data...");
-    
-    // Parse the incoming form data (files + fields)
-    // formidable.parse returns an array: [fields, files]
-    const [fields, files] = await form.parse(req);
-    
-    // Extract the uploaded resume file
-    const file = files.resume?.[0];
-    
-    // Validate that a file was uploaded
-    if (!file || !file.filepath) {
-      console.error("❌ No file uploaded or file parsing failed");
+    // Check content type
+    const contentType = req.headers['content-type'];
+    if (!contentType || !contentType.includes('multipart/form-data')) {
       return res.status(400).json({ 
-        success: false,  
-        message: "No file uploaded. Please select a resume file." 
+        success: false, 
+        message: "Invalid content type. Expected multipart/form-data" 
       });
     }
 
-    // Store temp file path for cleanup
-    tempFilePath = file.filepath;
-    console.log(`✅ File uploaded temporarily to: ${tempFilePath}`);
-    console.log(`📄 File details: ${file.originalFilename}, Size: ${file.size} bytes, Type: ${file.mimetype}`);
+    // Parse multipart form data
+    const boundary = contentType.split('boundary=')[1];
+    if (!boundary) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid form data" 
+      });
+    }
 
-    // ================================
-    // 5. READ AND VALIDATE FILE CONTENT
-    // ================================
-    console.log("📖 Reading file content...");
+    // Read the request body
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    // Parse the multipart data
+    const parts = buffer.toString('binary').split(`--${boundary}`);
     
-    // Check if file exists and has content
-    if (!fs.existsSync(file.filepath)) {
-      throw new Error("Uploaded file not found on server");
+    let fileBuffer = null;
+    let filename = null;
+    let fileType = null;
+    
+    for (const part of parts) {
+      if (part.includes('Content-Disposition: form-data') && part.includes('name="resume"')) {
+        // Extract filename
+        const filenameMatch = part.match(/filename="([^"]+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+        
+        // Extract content type
+        const contentTypeMatch = part.match(/Content-Type: ([^\r\n]+)/);
+        if (contentTypeMatch) {
+          fileType = contentTypeMatch[1].trim();
+        }
+        
+        // Extract file content
+        const contentStart = part.indexOf('\r\n\r\n') + 4;
+        const contentEnd = part.lastIndexOf('\r\n');
+        if (contentStart < contentEnd) {
+          const fileContent = part.substring(contentStart, contentEnd);
+          fileBuffer = Buffer.from(fileContent, 'binary');
+        }
+        break;
+      }
     }
 
-    const stats = fs.statSync(file.filepath);
-    if (stats.size === 0) {
-      throw new Error("Uploaded file is empty");
+    // Validate file
+    if (!fileBuffer || !filename) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "No file uploaded or file parsing failed" 
+      });
     }
 
-   
-    // ================================
-    // 6. EXTRACT TEXT FROM FILE BASED ON TYPE
-    // ================================
-    console.log(`🔧 Extracting text from ${file.mimetype}...`);
+    console.log(`✅ File received: ${filename}, Type: ${fileType || 'unknown'}, Size: ${fileBuffer.length} bytes`);
+
+    // Validate file type
+    const allowedTypes = [
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ];
+    
+    if (fileType && !allowedTypes.includes(fileType)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid file type. Please upload PDF, TXT, DOC, or DOCX files." 
+      });
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (fileBuffer.length > maxSize) {
+      return res.status(413).json({ 
+        success: false, 
+        message: "File too large. Maximum size is 10MB." 
+      });
+    }
+
+    // Extract text based on file type
     let extractedText = "";
-    const buffer = fs.readFileSync(file.filepath);
-
-    // DEBUG: Check what we're getting
-    console.log(`📊 Buffer size: ${buffer.length} bytes`);
-    console.log(`🔍 First 100 chars of buffer: ${buffer.toString('utf-8', 0, 100)}`);
-
-    // Handle different file types
-    if (file.mimetype === "application/pdf") {
-      // PDF file - use pdf-parse for text extraction
+    
+    if (fileType === "application/pdf") {
       try {
         console.log("📄 Processing PDF file...");
-        
-        // FIX: Try different import methods for pdf-parse
-        let pdfParse;
-        try {
-          // Method 1: Try as default export
-          const pdfModule = await import('pdf-parse');
-          pdfParse = pdfModule.default;
-          console.log("✅ Imported pdf-parse as default export");
-        } catch (importError) {
-          // Method 2: Try as named export
-          const pdfModule = await import('pdf-parse');
-          pdfParse = pdfModule;
-          console.log("✅ Imported pdf-parse as named export");
-        }
-        
-        // Verify pdfParse is a function
-        if (typeof pdfParse !== 'function') {
-          throw new Error(`pdf-parse is not a function. Type: ${typeof pdfParse}`);
-        }
-        
-        // Parse PDF and extract text
-        console.log("🔄 Parsing PDF buffer...");
-        const pdfData = await pdfParse(buffer);
+        const { default: pdfParse } = await import('pdf-parse');
+        const pdfData = await pdfParse(fileBuffer);
         extractedText = pdfData.text || "";
         
-        console.log(`✅ PDF text extracted: ${extractedText.length} characters`);
-        
-        if (extractedText.length > 0) {
-          console.log("📝 First 200 chars:", extractedText.substring(0, 200));
+        if (extractedText.trim()) {
+          console.log(`✅ PDF text extracted: ${extractedText.length} characters`);
+        } else {
+          console.log("⚠️ PDF extraction returned empty text, using fallback");
+          // Fallback: try to extract any readable text
+          extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 10000));
         }
-        
-        // Check if PDF extraction was successful
-        if (!extractedText || extractedText.trim().length === 0) {
-          console.warn("⚠️ PDF appears to be empty or text extraction failed");
-          
-          // Try alternative: Check if buffer has content
-          const bufferString = buffer.toString('utf-8', 0, 1000);
-          console.log("🔍 First 1000 chars of buffer:", bufferString.substring(0, 200));
-          
-          extractedText = "[PDF content extraction returned empty text]";
-        }
-        
       } catch (pdfError) {
         console.error("❌ PDF parsing error:", pdfError.message);
-        console.error("❌ Error stack:", pdfError.stack);
-        
-        // Fallback: Try to extract text manually
-        try {
-          console.log("🔄 Trying manual text extraction...");
-          const bufferString = buffer.toString('latin1');
-          
-          // Look for text patterns in PDF
-          const textInParentheses = bufferString.match(/\((.*?)\)/g);
-          if (textInParentheses) {
-            extractedText = textInParentheses
-              .map(text => text.slice(1, -1))
-              .filter(text => text.length > 1)
-              .join(' ');
-            console.log(`✅ Manual extraction from parentheses: ${extractedText.length} chars`);
-          }
-          
-          if (!extractedText || extractedText.length < 50) {
-            // Try to extract any readable ASCII text
-            const asciiText = buffer.toString('ascii', 0, Math.min(buffer.length, 10000));
-            const readableWords = asciiText.match(/[A-Za-z]{3,}/g);
-            if (readableWords) {
-              extractedText = readableWords.join(' ');
-              console.log(`✅ ASCII extraction: ${extractedText.length} chars`);
-            }
-          }
-          
-          if (!extractedText || extractedText.length < 10) {
-            extractedText = `[PDF parsing failed: ${pdfError.message}]`;
-          }
-          
-        } catch (fallbackError) {
-          extractedText = `[All extraction methods failed: ${pdfError.message}]`;
-        }
+        // Fallback for PDF errors
+        extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 10000));
       }
-    } else if (file.mimetype === "text/plain") {
-      // Plain text file - direct UTF-8 conversion
+    } else if (fileType === "text/plain") {
       console.log("📝 Processing text file...");
-      extractedText = buffer.toString("utf-8");
+      extractedText = fileBuffer.toString('utf-8');
       console.log(`✅ Text file processed: ${extractedText.length} characters`);
-    } else if (
-      file.mimetype === "application/msword" || 
-      file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ) {
-      // Word document - basic text extraction
-      console.log("📘 Processing Word document...");
-      
-      // For DOC/DOCX files, we do basic text extraction
-      // Note: For better extraction, consider using 'mammoth' library
-      try {
-        extractedText = buffer.toString("utf-8", 0, Math.min(buffer.length, 50000));
-        
-        // Clean up binary artifacts for Word docs
-        extractedText = extractedText.replace(/[^\x20-\x7E\n\r\t]/g, ' ');
-        console.log(`✅ Word document processed: ${extractedText.length} characters`);
-        
-        if (!extractedText || extractedText.trim().length < 10) {
-          extractedText = "[Word document content extraction limited. Consider using a dedicated DOCX parser for better results.]";
-        }
-      } catch (wordError) {
-        console.error("❌ Word document processing error:", wordError.message);
-        extractedText = `[Error processing Word document: ${wordError.message}]`;
-      }
     } else {
-      // Unsupported file type (should be caught by filter, but double-check)
-      throw new Error(`Unsupported file type: ${file.mimetype}`);
-    }
-    // ================================
-    // 7. CLEAN AND VALIDATE EXTRACTED TEXT
-    // ================================
-    console.log("🧹 Cleaning extracted text...");
-    
-    // First, check if we have actual text or just error messages
-    if (extractedText.startsWith('[ERROR:') || 
-        extractedText.startsWith('[PDF') || 
-        extractedText.startsWith('[This PDF') ||
-        extractedText.startsWith('[Could not')) {
-      console.log("ℹ️ Extracted text appears to be an error message, not actual resume text");
-      // Keep the error message as-is so user knows what happened
-    } else if (extractedText.includes("%PDF-1.")) {
-      console.error("❌ ERROR: Still getting raw PDF data!");
-      extractedText = "[ERROR: PDF text extraction completely failed. Try a different PDF file.]";
-    }
-    
-    // Only clean if we have actual text
-    let cleanedText = extractedText;
-    if (!cleanedText.startsWith('[')) {
-      // Remove excessive whitespace and normalize
-      cleanedText = extractedText
-        .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
-        .replace(/\n\s*\n/g, '\n\n')    // Normalize line breaks
-        .trim();
-      
-      // Limit text length to prevent MongoDB document size issues
-      const maxTextLength = 100000; // 100KB max
-      if (cleanedText.length > maxTextLength) {
-        console.warn(`⚠️ Text truncated from ${cleanedText.length} to ${maxTextLength} characters`);
-        cleanedText = cleanedText.substring(0, maxTextLength) + "... [text truncated]";
-      }
-      
-      // Check if we have meaningful text
-      if (!cleanedText || cleanedText.trim().length < 10) {
-        console.warn("⚠️ Extracted text is very short or empty");
-        cleanedText = "[No text content could be extracted from the file]";
+      // For DOC/DOCX or unknown types
+      console.log("📄 Processing document file...");
+      try {
+        extractedText = fileBuffer.toString('utf-8', 0, Math.min(fileBuffer.length, 50000));
+        // Clean up non-printable characters
+        extractedText = extractedText.replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+        console.log(`✅ Document processed: ${extractedText.length} characters`);
+      } catch (error) {
+        console.error("Document processing error:", error);
+        extractedText = "[Could not extract text from this file type]";
       }
     }
 
-    console.log(`✅ Text cleaned: ${cleanedText.length} characters remaining`);
-    console.log(`📝 Final text to save (first 500 chars): ${cleanedText.substring(0, 500)}`);
-    
-    // Check if it's worth saving
-    if (cleanedText.startsWith('[') && cleanedText.endsWith(']')) {
-      console.warn("⚠️ Warning: Only saving error message, not actual resume text");
+    // Clean and trim the text
+    let cleanedText = extractedText
+      .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+      .replace(/\n\s*\n/g, '\n') // Normalize line breaks
+      .trim();
+
+    // Limit text length for MongoDB
+    const maxTextLength = 100000; // 100KB
+    if (cleanedText.length > maxTextLength) {
+      console.log(`⚠️ Text truncated from ${cleanedText.length} to ${maxTextLength} characters`);
+      cleanedText = cleanedText.substring(0, maxTextLength) + "... [text truncated]";
     }
-    // ================================
-    // 8. SAVE TO MONGODB
-    // ================================
+
+    // Check if we have meaningful content
+    if (!cleanedText || cleanedText.trim().length < 10) {
+      console.log("⚠️ Extracted text is very short or empty");
+      cleanedText = cleanedText || "[No readable text content could be extracted from the file]";
+    }
+
+    console.log(`✅ Final text length: ${cleanedText.length} characters`);
+
+    // Save to MongoDB
     console.log("💾 Saving to MongoDB...");
-    
-   console.log(`📦 Text content type: ${typeof cleanedText}`);
-    console.log(`📦 Text starts with: ${cleanedText.substring(0, 50)}...`);
-    console.log(`📦 Text ends with: ...${cleanedText.substring(Math.max(0, cleanedText.length - 50))}`);
-
-    // Extract userId from form fields (assuming it's sent in the form)
-    // Note: Your Resume model doesn't have userId field based on your schema
-    // If you need userId, you should add it to the schema
-    // const userId = fields.userId?.[0] || "unknown";
-    
-    // Create document in MongoDB using your Resume model
     const savedResume = await Resume.create({
       userId: userId,
-      filename: file.originalFilename,
+      filename: filename,
       text: cleanedText,
       uploadedAt: new Date(),
     });
 
-    console.log(`✅ Saved to MongoDB with ID: ${savedResume._id}`);
-    res.json({ success: true, resumeId: savedResume._id });
+    console.log(`✅ Resume saved with ID: ${savedResume._id}`);
 
-    // ================================
-    // 9. CLEANUP TEMPORARY FILE
-    // ================================
-    console.log("🗑️ Cleaning up temporary file...");
-    if (fs.existsSync(file.filepath)) {
-      try {
-        fs.unlinkSync(file.filepath);
-        console.log(`✅ Temporary file deleted: ${file.filepath}`);
-      } catch (cleanupError) {
-        console.error("⚠️ Failed to delete temporary file:", cleanupError.message);
-        // Don't fail the request if cleanup fails
-      }
-    }
-
-    // ================================
-    // 10. RETURN SUCCESS RESPONSE
-    // ================================
-    console.log("🎉 Upload process completed successfully");
-    
+    // Return success response
     return res.status(200).json({
       success: true,
-      message: "Resume uploaded and processed successfully",
-      data: {
-        resumeId: savedResume._id.toString(),
-        filename: savedResume.filename,
-        textLength: savedResume.text.length,
-        uploadDate: savedResume.uploadedAt,
-      }
+      resumeId: savedResume._id,
+      message: "Resume uploaded successfully",
+      filename: savedResume.filename,
+      textLength: savedResume.text.length,
     });
 
   } catch (error) {
-    // ================================
-    // ERROR HANDLING AND CLEANUP
-    // ================================
     console.error("❌ UPLOAD ERROR:", error);
-
-    // Cleanup temporary file if it exists
-    if (tempFilePath && fs.existsSync(tempFilePath)) {
-      try {
-        fs.unlinkSync(tempFilePath);
-        console.log(`✅ Cleared temporary file after error: ${tempFilePath}`);
-      } catch (cleanupError) {
-        console.error("❌ Failed to cleanup temp file after error:", cleanupError.message);
-      }
-    }
-
-    // Determine appropriate error response
-    let statusCode = 500;
+    
+    // Return appropriate error message
     let errorMessage = "An unexpected error occurred";
+    let statusCode = 500;
 
-    // Handle specific error types
-    if (error.message.includes("maxFileSize") || error.code === "LIMIT_FILE_SIZE") {
-      statusCode = 413;
-      errorMessage = "File too large. Maximum size is 10MB.";
-    } else if (error.message.includes("Unsupported file type") || error.message.includes("Invalid file type")) {
-      statusCode = 400;
-      errorMessage = "Unsupported file type. Please upload PDF, TXT, DOC, or DOCX files only.";
-    } else if (error.message.includes("No file uploaded")) {
-      statusCode = 400;
-      errorMessage = "No file was uploaded. Please select a resume file.";
-    } else if (error.message.includes("empty")) {
-      statusCode = 400;
-      errorMessage = "Uploaded file is empty.";
+    if (error.message?.includes("Mongo") || error.message?.includes("database")) {
+      errorMessage = "Database error. Please try again.";
+    } else if (error.message?.includes("PDF") || error.message?.includes("parse")) {
+      errorMessage = "Error processing the file. Please try a different file.";
     }
 
-    // Return error response
     return res.status(statusCode).json({
       success: false,
       message: errorMessage,
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
-      timestamp: new Date().toISOString()
     });
-  } finally {
-    // Optional: Close database connection if you're managing connections manually
-    // Note: Mongoose typically handles connection pooling automatically
-    if (connectionEstablished) {
-      console.log("🔌 Database connection maintained (pooled)");
-    }
   }
 }
